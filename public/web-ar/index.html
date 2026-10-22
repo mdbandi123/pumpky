@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pumpky browser tracker</title>
+  <style>
+    html, body, #stage { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { background: #211c27; }
+    #stage { position: relative; isolation: isolate; }
+    #stage > video { z-index: 0 !important; }
+    #stage > canvas { z-index: 1 !important; }
+    #stage > div { pointer-events: none; }
+  </style>
+  <script type="importmap">
+    {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+  </script>
+</head>
+<body>
+  <div id="stage"></div>
+  <script type="module" src="./scene.web.js"></script>
+</body>
+</html>
