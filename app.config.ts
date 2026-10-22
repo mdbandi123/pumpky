@@ -5,33 +5,44 @@ const config: ExpoConfig = {
   "slug": "pumpky",
   "version": "1.0.0",
   "orientation": "portrait",
-  "icon": "./assets/images/icon.png",
+  "icon": "./assets/branding/icon.png",
   "scheme": "pumpky",
   "userInterfaceStyle": "automatic",
   "ios": {
-    "icon": "./assets/expo.icon"
+    "icon": "./assets/branding/icon.png",
+    "bundleIdentifier": "com.mdbandi123.pumpky"
   },
   "android": {
     "adaptiveIcon": {
-      "backgroundColor": "#E6F4FE",
-      "foregroundImage": "./assets/images/android-icon-foreground.png",
-      "backgroundImage": "./assets/images/android-icon-background.png",
-      "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      "backgroundColor": "#151219",
+      "foregroundImage": "./assets/branding/foreground.png"
     },
     "predictiveBackGestureEnabled": false
   },
   "web": {
     "output": "server",
-    "favicon": "./assets/images/favicon.png"
+    "favicon": "./assets/branding/favicon.png"
   },
   "plugins": [
     "expo-router",
+    "expo-asset",
+    ["@reactvision/react-viro", {
+      "provider": "none",
+      "ios": { "cameraUsagePermission": "Pumpky uses the camera to bring your Halloween basket to life." }
+    }],
+    ["expo-camera", {
+      "cameraPermission": "Pumpky uses the camera to bring your Halloween basket to life.",
+      "microphonePermission": false,
+      "recordAudioAndroid": false,
+      "barcodeScannerEnabled": false
+    }],
+    "expo-sharing",
     [
       "expo-splash-screen",
       {
-        "backgroundColor": "#208AEF",
-        "image": "./assets/images/splash-icon.png",
-        "imageWidth": 76
+        "backgroundColor": "#151219",
+        "image": "./assets/branding/foreground.png",
+        "imageWidth": 160
       }
     ]
   ],
