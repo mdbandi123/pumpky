@@ -1,56 +1,46 @@
-# Welcome to your Expo app 👋
+# Pumpky
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A Halloween basket AR experiment for iPhone, built with Expo SDK 57 and ViroReact.
 
-## Get started
+Point at the printed badge on your basket, choose Jack, Boo, or Goblin, adjust the fit, and capture a still photo. The screen includes a badge setup guide and a photo preview with save/share controls.
 
-1. Install dependencies
+## Run
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm ci
+npx expo start --dev-client
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+The iPhone AR experience requires a custom build on a physical device. `npm run web` also offers **Test with webcam**: a separate MindAR/Three.js browser experiment using the same badge, style picker, fit controls, and still capture. It tests the visual idea and marker, rather than Viro/ARKit compatibility.
 
-### Other setup steps
+For the webcam test, open the app on `localhost` in Chrome or Edge, click **Test with webcam**, allow camera access, and show the badge to the camera. The tracker loads pinned libraries from a CDN and compiles the badge on startup; internet access is required. Photos download as PNGs. Stop the camera with **Stop webcam**. Use localhost or HTTPS, since ordinary HTTP on a LAN address cannot access browser cameras.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+See the [build guide](docs/feasibility-build.md) for signing, installation, known limitations, and the device test checklist.
 
-## Learn more
+## Tracking badge
 
-To learn more about developing your project with Expo, look at the following resources:
+Open [the printable badge](assets/markers/print.html) in a browser and print at actual size: **80 × 100 mm**. Mount it flat and rigidly on the basket’s front centre.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Project layout
 
-## Join the community
+- `src/app/` — Expo Router screens and navigation.
+- `components/` — reusable controls, creature previews, and AR views.
+- `src/features/` — basket design data.
+- `assets/creatures/` — rendered thumbnails of the actual 3D designs.
+- `assets/models/` — shared GLB cup designs for web and iPhone.
+- `assets/markers/` — printable image target and its source.
+- `assets/branding/` — Pumpky app icon and splash assets.
+- `public/web-ar/` — browser-only marker tracking adapter, loaded on demand.
+- `scripts/` — reproducible model generation and thumbnail rendering.
+- `docs/` — feasibility findings and build instructions.
 
-Join our community of developers creating universal apps.
+## Checks
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```sh
+npm run lint
+npm run typecheck
+npx expo-doctor
+npx expo export --platform ios --platform web
+```
+
+The models currently use a cup silhouette for testing. Regenerate them with `npm run models:build`; regenerate picker thumbnails with `npm run models:previews` (requires Chromium and internet access). Real prop alignment, native compilation, and iPhone rendering still require device tests.
