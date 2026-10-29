@@ -42,6 +42,8 @@
     "typecheck": "tsc --noEmit",
     "test:install": "node scripts/check-install.mjs",
     "test:web": "node scripts/check-web.mjs",
+    "test:fit": "node scripts/check-fit.mjs",
+    "test:statue": "node scripts/check-statue-placement.mjs && node scripts/check-web.mjs --statue",
     "models:build": "node scripts/build-models.mjs",
     "models:previews": "node scripts/render-model-previews.mjs"
   },

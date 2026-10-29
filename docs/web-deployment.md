@@ -32,4 +32,32 @@ Run `npm run test:install` after dependency changes. It tests both updating the 
 
 Local validation uses Chromium phone-size emulation, not Safari. A physical iPhone is required to establish actual Safari performance, camera behavior, safe-area rendering, target alignment, and the OS share sheet. Browser tracking does not provide ARKit world tracking, hand occlusion, or reliable recognition without the visible badge.
 
+## Current basket fit
+
+When the design stays attached but the sides/orientation look wrong, use live calibration rather than adding markers or enlarging every dimension together. In **Fit → Angle**, adjust **Turn** (Y/yaw), **Tilt** (X/pitch), and **Lean** (Z/roll) in 5° steps. In **Shape**, adjust width/height/depth independently in 5% steps. **Position** moves left/right, up/down, and back/forward in 5 mm steps, in the badge's local coordinate frame. Keep the badge flat and rigid; these offsets correct the fixed marker-to-basket relationship, not bending/moving targets.
+
+The shared transform in `public/web-ar/basket-fit.js` rotates/scales the model about its centre, then positions it behind the badge. Depth adjustments also adjust the default centre offset so the front surface stays near the target plane. Native rendering uses metres; the browser converts those values into marker-width units. The browser stores calibration at `pumpky-basket-fit-v1`, shared by all three designs. Blocked storage falls back to session memory; native calibration is session-only. Tracking Reset preserves calibration; the panel's Reset fit clears it. No additional markers, pose fusion, or automatic basket scanning are implemented by these controls.
+
+Automated tests check the transform math, controls, saved settings, reload, and reset. They do not establish the final real-basket alignment: that requires adjusting while viewing the actual prop from the front and both sides.
+
+The physical basket is reported as roughly 5–6 inches high. The models use the midpoint, **5½ inches / 139.7 mm**, interpreted as the body only, excluding the real arch handle. Width is estimated at 160 mm and depth at 140 mm from the supplied photo. These are starting dimensions, not an exact scan. The shell is independently widened and deepened from the earlier cup prototype; all three designs and their thumbnails use the same body proportions. The real handle remains visible rather than adding a second virtual arch.
+
+Fit 100% adds a **20% coverage allowance** in all dimensions and raises the shell **8 mm** relative to the marker. The resulting body envelope is approximately 19.2 cm wide × 16.8 cm tall × 16.8 cm deep, leaving the real handle above it. This is deliberate visual coverage, not a revised measurement of the basket; it reduces visible wicker edges and rim intersections seen in the real-prop test.
+
+Edit `src/features/basket-dimensions.json` and regenerate models/previews if measurements change. Both renderers derive the marker-to-centre depth offset from half the coverage-adjusted basket depth. The badge must still be printed at 80 × 100 mm. Use Fit around 100% for final adjustment; stop/start the camera after model changes so its cached GLBs reload.
+
+## Base-marker statue surprise (web)
+
+The compiled target set now contains the original front badge at index 0 and `statue-badge.png` at index 1. `maxTrack: 1` deliberately keeps one target active at a time. The second marker has its own anchor and ignores basket fit calibration. It displays the user-provided statue as a generated transparent photo texture on a double-sided plane, with a small 3D plinth. This is an image-based standee, not a sculpted or reconstructed 360° statue. The normal front badge and all three basket designs remain unchanged in behavior.
+
+Print `/badge/statue-print.html` at actual size (80 × 100 mm) and mount the full badge flat on the basket base. Show it to the camera to activate the statue and the audio controls. Source artwork and print HTML live in `assets/markers/`; `prepare-web.mjs` copies the canonical print assets for both badges before development/export.
+
+The user subsequently provided `/HDD/Downloads/Rene Baterbonia Mama - Sound Effect.mp3`. The original 38,021-byte, roughly three-second file is bundled at `public/audio/rene-baterbonia-mama.mp3`, copied without transcoding. Every deployed browser receives the included soundtrack; no upload/file picker or IndexedDB dependency is required. The earlier local-audio chooser/storage code has been removed. Build/deployment only needs the checked-in asset, not access to `/HDD`.
+
+Audio loops only while the statue target is active and the app is foregrounded with the camera active. It pauses for tracking loss, camera stop, guide, and photo preview. Browser autoplay rejection exposes a **Play sound** tap button; direct play in the tap handler accommodates Safari's user-activation requirement. Loading/decode failures are shown without blocking AR. Audio is not mixed into still PNG captures. Web Audio/Expo audio dependencies are not needed for this browser-only feature; native Viro remains basket-only.
+
+The statue now uses tabletop orientation: the badge is the XY ground plane and the sculpture rises along +Z. The plinth bottom rests on Z=0, its approximately 7.2 cm footprint fits within the badge, and the figure's feet remain centred on the plinth. The photo plane turns about this upright axis toward the camera, never tilting or moving its feet. The figure is approximately 11 cm tall above the plinth. This is best viewed looking down at an angle; directly overhead a thin photo plane necessarily becomes edge-on. A genuine 360° or anatomically correct overhead view requires a real 3D statue mesh.
+
+`npm run test:statue` first verifies badge-plane grounding, footprint, upright orientation, and camera-facing feet pivot. It then tests the real second-marker tracker with a synthetic video feed and the actual bundled MP3: playback without a file picker, PNG capture, pause/resume with photo/camera, and fresh-page reload. Actual iPhone Safari playback and physical badge placement still require a device check.
+
 References: [Expo static rendering](https://docs.expo.dev/router/web/static-rendering/), [Expo publishing/Vercel](https://docs.expo.dev/guides/publishing-websites/), [Vercel configuration](https://vercel.com/docs/project-configuration/vercel-json), [camera secure contexts](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia), [Web Share](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share).

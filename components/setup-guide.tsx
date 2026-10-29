@@ -24,6 +24,9 @@ export function SetupGuide({ visible, onClose }: { visible: boolean; onClose: ()
           </View>
           {Platform.OS === 'web' && <a href="/badge/print.html" target="_blank" rel="noopener noreferrer"
             style={{ color: palette.accent, fontSize: 14, padding: '12px 0' }}>Open printable badge ↗</a>}
+          {Platform.OS === 'web' && <><a href="/badge/statue-print.html" target="_blank" rel="noopener noreferrer"
+            style={{ color: palette.accent, fontSize: 14, padding: '12px 0' }}>Print the mystery base badge ↗</a>
+            <Text style={styles.copy}>Lay the question-mark badge flat on the base and look down from a slight angle. The surprise stands on the badge and includes its soundtrack—no upload needed. Audio pauses when the badge disappears; Safari may need one tap on Play sound.</Text></>}
           <Step number="01" title="Dress the basket" detail="Fix the badge to the front centre of your basket. Keep it still against the basket, with no curves or dangling edges." />
           <Step number="02" title="Find the magic" detail={Platform.OS === 'web'
             ? 'Tap Start camera and allow access. On iPhone, open Pumpky directly in Safari. Point the rear camera at the whole badge in good light.'

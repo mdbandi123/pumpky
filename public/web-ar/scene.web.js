@@ -1,13 +1,16 @@
 /* eslint-disable import/no-unresolved -- Browser imports resolve through index.html's import map and pinned CDN URLs. */
 // Web AR renderer. Pinned ESM builds load on demand, outside Metro/native bundles.
+import { basketTransform, normalizeCalibration } from './basket-fit.js';
+import { createStatue } from './statue.js';
 const channel = 'pumpky-web-ar';
 const stage = document.getElementById('stage');
-let engine, anchor, creature, THREE, compiledTarget;
+let engine, anchor, statueAnchor, statue, creature, THREE, compiledTarget;
 let running = false, tracked = false, wanted = false;
 let sequence = Promise.resolve();
-let settings = { design: 'pumpkin', scale: 1 };
+let settings = { design: 'pumpkin', scale: 1, calibration: normalizeCalibration(null) };
 let modelUrls = {};
-let modelWidth = 0.08, frontOffset = 0.05;
+let statueUrl, activeTarget = null;
+let modelWidth = 0.08, frontOffset = 0.084;
 const models = new Map();
 
 function notify(type, data = {}) {
@@ -15,7 +18,7 @@ function notify(type, data = {}) {
 }
 function status(state, message = null) { notify('status', { state, message }); }
 
-async function prepare(markerUrl) {
+async function prepare(markerUrl, baseMarkerUrl) {
   if (engine) return;
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
     throw new Error('Camera access needs HTTPS. On iPhone, open the deployed Pumpky link directly in Safari.');
@@ -33,13 +36,13 @@ async function prepare(markerUrl) {
   await Promise.all(Object.entries(modelUrls).map(async ([id, url]) => {
     models.set(id, (await loader.loadAsync(url)).scene);
   }));
-  const image = new Image();
-  image.src = markerUrl;
-  await image.decode();
+  const images = await Promise.all([markerUrl, baseMarkerUrl].map(async (url) => {
+    const image = new Image(); image.src = url; await image.decode(); return image;
+  }));
   const compiler = new Compiler();
-  status('starting', 'Preparing your Pumpky badge…');
-  await compiler.compileImageTargets([image], (progress) => {
-    status('starting', `Preparing your Pumpky badge… ${Math.round(progress)}%`);
+  status('starting', 'Preparing the front and base badges…');
+  await compiler.compileImageTargets(images, (progress) => {
+    status('starting', `Preparing your Pumpky badges… ${Math.round(progress)}%`);
   });
   compiledTarget = URL.createObjectURL(new Blob([compiler.exportData()]));
   engine = new MindARThree({
@@ -58,8 +61,23 @@ async function prepare(markerUrl) {
   fill.position.set(2, 1, 2);
   engine.scene.add(fill);
   anchor = engine.addAnchor(0);
-  anchor.onTargetFound = () => { tracked = true; status('tracking'); };
-  anchor.onTargetLost = () => { tracked = false; status('lost'); };
+  statueAnchor = engine.addAnchor(1);
+  statue = await createStatue(THREE, statueUrl);
+  statueAnchor.group.add(statue.group);
+  // Use the live pose rather than detection edges: a late callback from the
+  // previous session can leave MindAR's visible flag set during camera resume.
+  const reportTarget = () => {
+    if (!running || !wanted) return;
+    const next = statueAnchor.group.visible ? 'statue' : anchor.group.visible ? 'basket' : null;
+    const visible = next !== null;
+    if (next === activeTarget && visible === tracked) return;
+    activeTarget = next;
+    tracked = visible;
+    notify('target', { target: next });
+    status(visible ? 'tracking' : 'lost');
+  };
+  anchor.onTargetUpdate = reportTarget;
+  statueAnchor.onTargetUpdate = reportTarget;
   updateCreature();
 }
 
@@ -74,17 +92,22 @@ function updateCreature() {
 
 function applyFit() {
   if (!creature) return;
-  creature.scale.setScalar(settings.scale / modelWidth);
-  creature.position.z = -frontOffset * settings.scale / modelWidth;
+  const transform = basketTransform(settings.scale, settings.calibration, frontOffset, 1 / modelWidth);
+  creature.scale.set(...transform.scale);
+  creature.position.set(...transform.position);
+  creature.rotation.set(...transform.rotation.map((degrees) => degrees * Math.PI / 180));
 }
 
 function stop() {
   running = false; tracked = false;
-  if (anchor) {
-    anchor.group.visible = false;
+  activeTarget = null;
+  notify('target', { target: null });
+  for (const target of [anchor, statueAnchor]) {
+    if (!target) continue;
+    target.group.visible = false;
     // MindAR retains this detection edge flag across start/stop. Reset it too,
     // otherwise an immediately visible badge never emits onTargetFound again.
-    anchor.visible = false;
+    target.visible = false;
   }
   engine?.renderer.setAnimationLoop(null);
   // Startup may reject before a controller exists; still release the camera stream.
@@ -93,16 +116,19 @@ function stop() {
   engine?.video?.remove();
 }
 
-async function start(markerUrl) {
+async function start(markerUrl, baseMarkerUrl) {
   if (running) return;
-  await prepare(markerUrl);
+  await prepare(markerUrl, baseMarkerUrl);
   if (!wanted) return;
   status('permission', 'Allow camera access when your browser asks. On iPhone, use the rear camera.');
   await engine.start();
   if (!wanted) { stop(); return; }
   running = true; tracked = false;
   status('searching');
-  engine.renderer.setAnimationLoop(() => engine.renderer.render(engine.scene, engine.camera));
+  engine.renderer.setAnimationLoop(() => {
+    if (statueAnchor.group.visible) statue.faceCamera(engine.camera);
+    engine.renderer.render(engine.scene, engine.camera);
+  });
 }
 
 function capture(id) {
@@ -127,10 +153,12 @@ window.addEventListener('message', (event) => {
   const data = event.data;
   if (data.type === 'settings' && ['pumpkin', 'ghost', 'monster'].includes(data.design)) {
     if (data.modelUrls) modelUrls = data.modelUrls;
+    if (data.statueUrl) statueUrl = data.statueUrl;
     if (Number.isFinite(data.markerWidth)) modelWidth = data.markerWidth;
-    if (Number.isFinite(data.cupFrontOffset)) frontOffset = data.cupFrontOffset;
+    if (Number.isFinite(data.basketFrontOffset)) frontOffset = data.basketFrontOffset;
     const changed = settings.design !== data.design;
-    settings = { design: data.design, scale: Math.min(2, Math.max(0.5, Number(data.scale) || 1)) };
+    settings = { design: data.design, scale: Math.min(2, Math.max(0.5, Number(data.scale) || 1)),
+      calibration: normalizeCalibration(data.calibration) };
     if (changed) updateCreature(); else applyFit();
   }
   if (data.type === 'capture') capture(data.id);
@@ -138,7 +166,7 @@ window.addEventListener('message', (event) => {
   if (data.type === 'reset') { stop(); if (wanted) data.type = 'start'; }
   if (data.type === 'start') {
     wanted = true;
-    sequence = sequence.then(() => start(data.markerUrl)).catch((error) => {
+    sequence = sequence.then(() => start(data.markerUrl, data.baseMarkerUrl)).catch((error) => {
       stop();
       notify('error', { message: error?.message || 'Camera access failed. Open Pumpky in Safari, allow camera access in the website settings, close other camera apps, and try again.' });
     });

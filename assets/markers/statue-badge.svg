@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+  <rect width="800" height="1000" fill="#fff4dc"/>
+  <rect x="32" y="32" width="736" height="936" rx="28" fill="#10275f"/>
+  <path d="M76 160V76h142M724 214V76H582M76 798v126h160M724 806v118H598" fill="none" stroke="#fff4dc" stroke-width="16"/>
+  <g fill="#f8a751"><path d="M96 224h74v32H96zM580 116h94v36h-94zM636 748h48v80h-48zM116 824h40v50h-40z"/>
+    <path d="m230 173 26-43 27 43-27 44zM639 282l33-26 24 42-43 24zM195 771l25-29 39 39-36 28z"/></g>
+  <g stroke="#fff4dc" stroke-width="5" fill="none"><path d="M102 320h64v-28h54v50h-46v44h-72zM590 580h88v56h-32v45h-54v-43h-26zM136 660v56h64v-30h58"/>
+    <circle cx="590" cy="230" r="22"/><path d="m184 480 33-24 34 42-38 22z"/></g>
+  <text x="400" y="225" text-anchor="middle" fill="#fff4dc" font-family="sans-serif" font-size="128" font-weight="900">?</text>
+  <circle cx="400" cy="487" r="183" fill="#f8a751" stroke="#fff4dc" stroke-width="12"/>
+  <g fill="none" stroke="#10275f" stroke-width="12"><circle cx="400" cy="487" r="155"/>
+    <path d="M245 487h310M400 332v310M289 378q184 109 222 218M511 378q-184 109-222 218"/>
+  </g>
+  <rect x="340" y="411" width="120" height="152" rx="16" fill="#10275f"/>
+  <text x="400" y="531" text-anchor="middle" fill="#fff4dc" font-family="sans-serif" font-size="132" font-weight="900">2</text>
+  <text x="400" y="742" text-anchor="middle" fill="#fff4dc" font-family="sans-serif" font-size="48" font-weight="900" letter-spacing="5">PILIPINAS</text>
+  <path d="m340 800 60 54 60-54" fill="none" stroke="#f8a751" stroke-width="14"/>
+  <text x="400" y="903" text-anchor="middle" fill="#fff4dc" font-family="sans-serif" font-size="27" font-weight="700" letter-spacing="4">BASE SURPRISE</text>
+</svg>

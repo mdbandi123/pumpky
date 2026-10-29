@@ -11,12 +11,13 @@ import process from 'node:process';
 const root = resolve('dist');
 await readFile(join(root, 'index.html'));
 const profile = await mkdtemp(join(tmpdir(), 'pumpky-web-check-'));
+const statueTest = process.argv.includes('--statue');
 const video = join(profile, 'badge.y4m');
-execFileSync('ffmpeg', ['-loglevel', 'error', '-loop', '1', '-i', 'assets/markers/pumpky-badge.png',
+execFileSync('ffmpeg', ['-loglevel', 'error', '-loop', '1', '-i', statueTest ? 'assets/markers/statue-badge.png' : 'assets/markers/pumpky-badge.png',
   '-vf', 'scale=288:360,pad=640:480:(ow-iw)/2:(oh-ih)/2:color=white',
   '-r', '15', '-t', '2', '-pix_fmt', 'yuv420p', '-f', 'yuv4mpegpipe', video]);
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
-  '.png': 'image/png', '.ico': 'image/x-icon', '.glb': 'model/gltf-binary' };
+  '.png': 'image/png', '.ico': 'image/x-icon', '.glb': 'model/gltf-binary', '.mp3': 'audio/mpeg' };
 const server = createServer(async (request, response) => {
   try {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
@@ -104,6 +105,11 @@ try {
     await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 500 });
     await call('Page.navigate', { url: address });
     await waitForStart();
+    assert(await evaluate(`(() => {
+      const control = ${button('Start camera')}.getBoundingClientRect();
+      const viewfinder = document.querySelector('[data-testid="camera-viewfinder"]').getBoundingClientRect();
+      return control.bottom <= viewfinder.top && control.width <= 140 && control.height <= 40;
+    })()`), 'Start camera must be compact and outside the viewfinder');
     assert(await evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Horizontal page overflow');
     assert(await evaluate(`document.querySelector('[name="viewport"]').content.includes('viewport-fit=cover')`));
     assert(await evaluate(`(() => {
@@ -121,12 +127,51 @@ try {
   await evaluate(button('Start camera') + '.click()');
   await waitFor(`window.pumpkyTestEvents.some(e => e.type === 'status' && e.state === 'tracking')`, 120000);
   assert.equal(await evaluate(`document.querySelector('iframe').contentWindow.pumpkyTestFacingMode`), 'environment');
+  assert(await evaluate(`(() => {
+    const control = ${button('Stop camera')}.getBoundingClientRect();
+    const viewfinder = document.querySelector('iframe').getBoundingClientRect();
+    return control.bottom <= viewfinder.top && control.width <= 140 && control.height <= 40;
+  })()`), 'Stop camera must be compact and outside the viewfinder');
   console.log('PASS: real badge detection with a synthetic rear-camera feed');
+  if (statueTest) {
+    await waitFor(`window.pumpkyTestEvents.some(e => e.type === 'target' && e.target === 'statue')`);
+    assert(await evaluate(`!document.querySelector('input[type="file"]')`), 'Audio must not require file selection');
+    const response = await fetch(address + '/audio/rene-baterbonia-mama.mp3');
+    assert.equal(response.status, 200);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()),
+      await readFile(new URL('../public/audio/rene-baterbonia-mama.mp3', import.meta.url)));
+    await waitFor(`document.querySelector('audio')?.readyState >= 2`);
+    if (await evaluate(`document.querySelector('audio').paused`)) {
+      await waitFor(button('Play sound'));
+      await evaluate(button('Play sound') + '.click()');
+    }
+    await waitFor(`!document.querySelector('audio').paused`);
+    assert.equal((await fetch(address + '/badge/statue-print.html')).status, 200);
+    assert(await evaluate(`document.querySelector('audio').duration > 0`));
+    console.log('PASS: real base-marker detection and bundled MP3 playback without file selection');
+  } else {
+  await evaluate(`document.querySelector('[aria-label="Adjust basket fit"]').click()`);
+  await waitFor('document.querySelector("[data-testid=\\"basket-fit-controls\\"]")');
+  await evaluate(`document.querySelector('[aria-label="Increase Width"]').click()`);
+  await waitFor(`JSON.parse(localStorage.getItem('pumpky-basket-fit-v1'))?.calibration.width === 1.05`);
+  await evaluate(button('Angle') + '.click()');
+  await waitFor(`document.querySelector('[aria-label="Increase Turn"]')`);
+  await evaluate(`document.querySelector('[aria-label="Increase Turn"]').click()`);
+  await waitFor(`JSON.parse(localStorage.getItem('pumpky-basket-fit-v1'))?.calibration.yaw === 5`);
+  await evaluate(button('Position') + '.click()');
+  await waitFor(`document.querySelector('[aria-label="Increase Up / down"]')`);
+  await evaluate(`document.querySelector('[aria-label="Increase Up / down"]').click()`);
+  await waitFor(`JSON.parse(localStorage.getItem('pumpky-basket-fit-v1'))?.calibration.offsetY === 0.005`);
+  await evaluate(button('Done') + '.click()');
+  await waitFor('!document.querySelector("[data-testid=\\"basket-fit-controls\\"]")');
+  console.log('PASS: independent size, rotation, position controls and saved calibration');
+  }
   await evaluate(`document.querySelectorAll('[role="radio"]')[1].click()`);
   await waitFor(`document.querySelectorAll('[role="radio"]')[1].getAttribute('aria-checked') === 'true'`);
   await waitFor(`document.querySelector('[aria-label="Capture basket photo"]').getAttribute('aria-disabled') !== 'true'`);
   await evaluate(`document.querySelector('[aria-label="Capture basket photo"]').click()`);
   await waitFor(button('Save / share'));
+  if (statueTest) await waitFor(`document.querySelector('audio').paused`);
   const photo = await evaluate(`window.pumpkyTestEvents.find(e => e.type === 'capture' && e.uri)?.uri`);
   assert(photo?.startsWith('data:image/png;base64,'));
   assert(Buffer.from(photo.split(',')[1], 'base64').length > 10000, 'Photo should contain camera and model pixels');
@@ -141,8 +186,26 @@ try {
   await evaluate('window.pumpkyTestEvents = []');
   await evaluate(button('Back to basket') + '.click()');
   await waitFor(`window.pumpkyTestEvents.some(e => e.type === 'status' && e.state === 'tracking')`, 30000);
+  if (statueTest) await waitFor(`!document.querySelector('audio').paused`);
   await evaluate(button('Stop camera') + '.click()');
   await waitFor('!document.querySelector("iframe")');
+  if (statueTest) assert(await evaluate(`document.querySelector('audio').paused`));
+  await call('Page.navigate', { url: address });
+  await waitForStart();
+  if (statueTest) {
+    await waitFor(`document.querySelector('audio')?.readyState >= 2`);
+    assert(await evaluate(`document.querySelector('audio').src.endsWith('/audio/rene-baterbonia-mama.mp3')`));
+    assert(await evaluate(`document.querySelector('audio').paused`));
+    console.log('PASS: audio pauses with camera/preview and remains bundled after reload');
+  } else {
+  await evaluate(`document.querySelector('[aria-label="Adjust basket fit"]').click()`);
+  await waitFor(button('Angle'));
+  await evaluate(button('Angle') + '.click()');
+  await waitFor(`document.querySelector('[data-testid="basket-fit-controls"]').textContent.includes('5°')`);
+  await evaluate(button('Reset fit') + '.click()');
+  await waitFor(`JSON.parse(localStorage.getItem('pumpky-basket-fit-v1'))?.calibration.yaw === 0`);
+  console.log('PASS: calibration survives reload and can be reset separately from tracking');
+  }
   assert.equal(errors.length, 0, errors.join('\n'));
   console.log('PASS: camera reacquisition after capture and camera shutdown');
 } catch (error) {

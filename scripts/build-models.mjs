@@ -1,8 +1,11 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Buffer } from 'node:buffer';
 import * as T from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+const basketDimensions = JSON.parse(await readFile(
+  new URL('../src/features/basket-dimensions.json', import.meta.url), 'utf8'));
 
 // GLTFExporter only needs this browser API for its final Blob, not a DOM or canvas.
 globalThis.FileReader = class {
@@ -20,10 +23,20 @@ function paint(name, color, roughness = 0.42, extra = {}) {
   return material;
 }
 
-function createCup(design) {
+function createBasket(design) {
   const root = new T.Group();
-  root.name = `Pumpky_${design}_cup`;
-  root.userData = { units: 'metres', nominalWidth: 0.1, nominalHeight: 0.12, front: '+Z' };
+  root.name = `Pumpky_${design}_basket`;
+  root.userData = { units: 'metres', nominalWidth: basketDimensions.bodyWidth,
+    nominalHeight: basketDimensions.bodyHeight, nominalDepth: basketDimensions.bodyDepth,
+    coverageScale: basketDimensions.coverageScale, centerLift: basketDimensions.centerLift,
+    front: '+Z', handle: 'Use the physical basket handle; body height excludes it.' };
+  // Author the reliefs in their original coordinates, then fit the whole design
+  // to a 5½-inch basket body. Widen independently instead of making a taller cup.
+  const coverage = basketDimensions.coverageScale;
+  root.scale.set(basketDimensions.bodyWidth * coverage / 0.1,
+    basketDimensions.bodyHeight * coverage / 0.121, basketDimensions.bodyDepth * coverage / 0.1);
+  // A slightly oversized, raised envelope hides wicker edges instead of intersecting them.
+  root.position.y = basketDimensions.centerLift;
   const isJack = design === 'pumpkin', isBoo = design === 'ghost';
   const color = isJack ? '#ed792f' : isBoo ? '#ebe5f4' : '#91b967';
   const body = paint('Glazed outer shell', color, isBoo ? 0.3 : 0.4, { vertexColors: true });
@@ -50,7 +63,7 @@ function createCup(design) {
     return mesh(name, new T.TubeGeometry(new T.CatmullRomCurve3(points.map((p) => new T.Vector3(...p))), 24, radius, 8, false), mat);
   }
 
-  // Outer wall, rounded lip, inner wall and floor form one continuous hollow cup.
+  // Outer wall, rounded lip, inner wall and floor form one continuous hollow shell.
   const profile = [
     [0, -0.06], [0.027, -0.06], [0.034, -0.057], [0.037, -0.05],
     [0.04, -0.035], [0.045, -0.012], [0.049, 0.012], [0.05, 0.035],
@@ -79,7 +92,7 @@ function createCup(design) {
   }
   wall.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
   wall.computeVertexNormals();
-  mesh('Hollow sculpted cup', wall, body);
+  mesh('Hollow sculpted basket', wall, body);
   const lip = mesh('Rounded opening', new T.TorusGeometry(0.0462, 0.00225, 12, 128), rim, [0, 0.0595, 0]);
   lip.rotation.x = Math.PI / 2;
   if (!isBoo) {
@@ -87,7 +100,7 @@ function createCup(design) {
     foot.rotation.x = Math.PI / 2;
   }
 
-  // Project relief geometry onto the curved front so faces wrap with the cup.
+  // Project relief geometry onto the curved front so faces wrap with the basket.
   const surface = (x, y) => {
     let base = 0.049;
     for (let i = 2; i < 10; i++) {
@@ -241,7 +254,7 @@ function createCup(design) {
 }
 
 for (const design of ['pumpkin', 'ghost', 'monster']) {
-  const object = createCup(design);
+  const object = createBasket(design);
   const scene = new T.Scene();
   scene.add(object);
   const bytes = await new GLTFExporter().parseAsync(scene, { binary: true });

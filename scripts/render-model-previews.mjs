@@ -28,12 +28,18 @@ const camera=new THREE.PerspectiveCamera(34,innerWidth/innerHeight,.001,10);came
 if(design==='monster'){camera.position.multiplyScalar(1.12);camera.lookAt(0,.014,0);}
 const gltf=await new GLTFLoader().loadAsync('/models/'+design+'.glb');
 scene.add(gltf.scene);
+const bounds=new THREE.Box3().setFromObject(gltf.scene);
+const center=bounds.getCenter(new THREE.Vector3());
+const radius=bounds.getBoundingSphere(new THREE.Sphere()).radius;
+const distance=radius/Math.sin(THREE.MathUtils.degToRad(camera.fov/2))*1.08;
+camera.position.copy(new THREE.Vector3(.09,.09,.25).normalize().multiplyScalar(distance).add(center));
+camera.lookAt(center);
 const shadowCanvas=document.createElement('canvas');shadowCanvas.width=128;shadowCanvas.height=128;
 const ctx=shadowCanvas.getContext('2d');const gradient=ctx.createRadialGradient(64,64,6,64,64,64);
 gradient.addColorStop(0,'rgba(0,0,0,.25)');gradient.addColorStop(1,'rgba(0,0,0,0)');
 ctx.fillStyle=gradient;ctx.fillRect(0,0,128,128);
-const floor=new THREE.Mesh(new THREE.PlaneGeometry(.17,.17),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(shadowCanvas),transparent:true,depthWrite:false}));
-floor.rotation.x=-Math.PI/2;floor.position.y=-.061;scene.add(floor);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(.24,.24),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(shadowCanvas),transparent:true,depthWrite:false}));
+floor.rotation.x=-Math.PI/2;floor.position.y=bounds.min.y-.001;scene.add(floor);
 renderer.setAnimationLoop(()=>renderer.render(scene,camera));
 document.body.dataset.ready='true';
 </script></body></html>
@@ -112,5 +118,5 @@ try {
   await new Promise((resolve) => browser.once('exit', resolve));
   server.closeAllConnections();
   server.close();
-  await rm(profile, { recursive: true, force: true });
+  await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

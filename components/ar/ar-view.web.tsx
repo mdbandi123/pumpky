@@ -2,21 +2,19 @@ import { Asset } from 'expo-asset';
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Button } from '../button';
 import { palette } from '../theme';
 import type { TrackingState } from '../tracking-status';
-import { creatureModels, cupFrontOffset, markerWidth } from '../../src/features/models';
+import { creatureModels, basketFrontOffset, markerWidth } from '../../src/features/models';
 import { DesignPreview } from './design-preview';
 import type { ARViewProps } from './types';
 
 const channel = 'pumpky-web-ar';
 const statuses = new Set<TrackingState>(['starting', 'permission', 'searching', 'tracking', 'lost', 'unavailable']);
 
-export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
+export function ARView({ ref, design, scale, calibration, active, cameraEnabled: enabled = false, onStatus, onTargetChange }: ARViewProps) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const [enabled, setEnabled] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(enabled ? 'Loading the browser tracker…' : null);
   const [failed, setFailed] = useState(false);
   const capture = useRef<{
     id: string; resolve: (uri: string) => void; reject: (error: Error) => void;
@@ -31,6 +29,7 @@ export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
       if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow || event.data?.channel !== channel) return;
       const data = event.data;
       if (data.type === 'ready') setLoaded(true);
+      if (data.type === 'target' && (data.target === 'basket' || data.target === 'statue' || data.target === null)) onTargetChange?.(data.target);
       if (data.type === 'status' && statuses.has(data.state)) {
         onStatus(data.state);
         setMessage(typeof data.message === 'string' ? data.message : null);
@@ -57,7 +56,7 @@ export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
         capture.current = null;
       }
     };
-  }, [onStatus]);
+  }, [onStatus, onTargetChange]);
 
   useEffect(() => {
     if (!enabled || loaded) return;
@@ -74,12 +73,16 @@ export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
     const modelUrls = Object.fromEntries(Object.entries(creatureModels).map(([id, module]) => [
       id, new URL(Asset.fromModule(module).uri, window.location.href).href,
     ]));
-    send({ type: 'settings', design, scale, modelUrls, cupFrontOffset, markerWidth });
+    const statue = Asset.fromModule(require('../../assets/tribute/statue-cutout.png'));
+    send({ type: 'settings', design, scale, calibration, modelUrls, basketFrontOffset, markerWidth,
+      statueUrl: new URL(statue.uri, window.location.href).href });
     if (active && !failed) {
       const marker = Asset.fromModule(require('../../assets/markers/pumpky-badge.png'));
-      send({ type: 'start', markerUrl: new URL(marker.uri, window.location.href).href });
+      const base = Asset.fromModule(require('../../assets/markers/statue-badge.png'));
+      send({ type: 'start', markerUrl: new URL(marker.uri, window.location.href).href,
+        baseMarkerUrl: new URL(base.uri, window.location.href).href });
     } else send({ type: 'stop' });
-  }, [enabled, loaded, active, failed, design, scale, send]);
+  }, [enabled, loaded, active, failed, design, scale, calibration, send]);
 
   useImperativeHandle(ref, () => ({
     capture() {
@@ -99,34 +102,19 @@ export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
     reset() { send({ type: 'reset' }); },
   }), [active, loaded, failed, send]);
 
-  function retry() {
-    setEnabled(false); setLoaded(false); setFailed(false); setMessage(null); onStatus('unavailable');
-  }
-
   return <View style={styles.container}>
-    {!enabled && <>
-      <DesignPreview design={design} scale={scale} active={active} onStatus={onStatus} />
-      <View style={styles.start}><Button label="Start camera" onPress={() => {
-        setEnabled(true); setMessage('Loading the browser tracker…'); onStatus('starting');
-      }} /></View>
-    </>}
+    {!enabled && <DesignPreview design={design} scale={scale} active={active} onStatus={onStatus} />}
     {enabled && <iframe ref={frame} src="/web-ar/index.html" title="Pumpky camera and badge tracking"
       allow="camera" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />}
     {enabled && message && <View style={styles.message}>
       <Text style={styles.messageText} accessibilityRole={failed ? 'alert' : undefined}>{message}</Text>
-      {failed && <Button label="Back to preview" variant="secondary" onPress={retry} />}
-    </View>}
-    {enabled && !failed && loaded && <View style={styles.stop}>
-      <Button label="Stop camera" variant="secondary" onPress={retry} />
     </View>}
   </View>;
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: palette.panel },
-  start: { position: 'absolute', bottom: 65, alignSelf: 'center' },
   message: { position: 'absolute', top: '29%', left: 20, right: 20, padding: 16,
     borderRadius: 16, backgroundColor: '#151219ee', gap: 12 },
   messageText: { color: palette.text, fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  stop: { position: 'absolute', top: 65, left: 14 },
 });

@@ -1,19 +1,22 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ARView } from '../../components/ar/ar-view';
 import type { ARHandle } from '../../components/ar/types';
 import { Button } from '../../components/button';
+import { BasketFitControls } from '../../components/basket-fit-controls';
 import { CapturePreview } from '../../components/capture-preview';
 import { SetupGuide } from '../../components/setup-guide';
 import { ShutterButton } from '../../components/shutter-button';
 import { StyleCarousel } from '../../components/style-carousel';
+import { StatueAudio } from '../../components/statue-audio';
 import { palette } from '../../components/theme';
 import { ToolButton } from '../../components/tool-button';
 import { TrackingStatus, type TrackingState } from '../../components/tracking-status';
 import { basketStyles, type BasketStyleId } from '../features/styles';
+import { useBasketFit } from '../features/use-basket-fit';
 
 export default function HomeScreen() {
   const ar = useRef<ARHandle>(null);
@@ -22,7 +25,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [design, setDesign] = useState<BasketStyleId>('pumpkin');
   const [tracking, setTracking] = useState<TrackingState>('starting');
-  const [scale, setScale] = useState(1);
+  const { scale, setScale, calibration, setCalibration, resetFit } = useBasketFit();
   const [focused, setFocused] = useState(false);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [busy, setBusy] = useState(false);
@@ -30,9 +33,12 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
   const [fitOpen, setFitOpen] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [target, setTarget] = useState<'basket' | 'statue' | null>(null);
   const selected = basketStyles.find((item) => item.id === design)!;
   const selectedNumber = basketStyles.findIndex((item) => item.id === design) + 1;
-  const cameraHeight = Math.max(280, Math.min(520, height - insets.top - insets.bottom - 460));
+  const cameraHeight = fitOpen ? Math.max(160, Math.min(260, height * 0.24))
+    : Math.max(280, Math.min(520, height - insets.top - insets.bottom - 460));
   const ready = tracking === 'tracking' && foreground && focused && !guideOpen && !photo;
   const canReset = !busy && tracking !== 'unavailable' && tracking !== 'permission';
 
@@ -53,7 +59,6 @@ export default function HomeScreen() {
   }
 
   function reset() {
-    setScale(1);
     setError(null);
     ar.current?.reset();
   }
@@ -66,33 +71,35 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.intro}>
+        {!fitOpen && <View style={styles.intro}>
           <Text style={styles.title}>A new face for your basket.</Text>
           <Text style={styles.subtitle}>A little spooky. A lot of you.</Text>
-        </View>
+        </View>}
 
-        <View style={[styles.camera, { height: cameraHeight * Math.min(fontScale, 1.3) }]}>
-          <ARView ref={ar} design={design} scale={scale} active={focused && foreground && !photo && !guideOpen} onStatus={setTracking} />
+        {Platform.OS === 'web' && <View style={styles.cameraControls}>
+          <Text style={styles.cameraLabel}>{cameraEnabled ? 'CAMERA' : 'DESIGN PREVIEW'}</Text>
+          <Button label={cameraEnabled ? 'Stop camera' : 'Start camera'} size="compact" variant="secondary"
+            disabled={busy} onPress={() => {
+              setCameraEnabled(!cameraEnabled);
+              setTarget(null);
+              setTracking(cameraEnabled ? 'unavailable' : 'starting');
+              setError(null);
+            }} />
+        </View>}
+
+        <View testID="camera-viewfinder" style={[styles.camera, { height: cameraHeight * Math.min(fontScale, 1.3) }]}>
+          <ARView key={cameraEnabled ? 'camera' : 'preview'} ref={ar} design={design} scale={scale}
+            calibration={calibration}
+            cameraEnabled={cameraEnabled} active={focused && foreground && !photo && !guideOpen} onStatus={setTracking}
+            onTargetChange={setTarget} />
           <View style={styles.cameraHeader} pointerEvents="box-none">
-            <View style={styles.designTag}><Text style={styles.tagNumber}>0{selectedNumber}</Text><Text style={styles.tagName}>{selected.name.toUpperCase()}</Text></View>
+            <View style={styles.designTag}><Text style={styles.tagNumber}>{target === 'statue' ? '02' : `0${selectedNumber}`}</Text><Text style={styles.tagName}>{target === 'statue' ? 'RENE' : selected.name.toUpperCase()}</Text></View>
             <Pressable accessibilityRole="button" accessibilityLabel="Adjust basket fit"
               accessibilityState={{ expanded: fitOpen }} onPress={() => setFitOpen((open) => !open)}
               style={({ pressed }) => [styles.fitButton, pressed && { opacity: 0.65 }]}>
               <Text style={styles.fitText}>⌗  Fit {Math.round(scale * 100)}%</Text>
             </Pressable>
           </View>
-
-          {fitOpen && <View style={styles.fitPanel}>
-            <Text style={styles.fitLabel}>MATCH YOUR BASKET</Text>
-            <View style={styles.fitControls}>
-              <Button label="−" accessibilityLabel="Make basket design smaller" variant="secondary" disabled={busy || scale <= 0.5}
-                onPress={() => setScale((s) => Math.max(0.5, Math.round((s - 0.1) * 10) / 10))} />
-              <Text style={styles.fitValue}>{Math.round(scale * 100)}%</Text>
-              <Button label="+" accessibilityLabel="Make basket design larger" variant="secondary" disabled={busy || scale >= 2}
-                onPress={() => setScale((s) => Math.min(2, Math.round((s + 0.1) * 10) / 10))} />
-            </View>
-            <Button label="Done" variant="secondary" onPress={() => setFitOpen(false)} />
-          </View>}
 
           {tracking !== 'unavailable' && <View style={styles.scanFrame} pointerEvents="none">
             <View style={[styles.corner, styles.topLeft]} /><View style={[styles.corner, styles.topRight]} />
@@ -106,11 +113,16 @@ export default function HomeScreen() {
           {error && <View style={styles.errorBanner}><Text style={styles.error} accessibilityRole="alert">{error}</Text></View>}
         </View>
 
-        <View style={styles.section}>
+        <StatueAudio visible={target === 'statue'} active={target === 'statue' && ready && cameraEnabled} />
+
+        {fitOpen && <BasketFitControls scale={scale} calibration={calibration} onScaleChange={setScale}
+          onChange={setCalibration} onReset={resetFit} onClose={() => setFitOpen(false)} disabled={busy} />}
+
+        {!fitOpen && <><View style={styles.section}>
           <Text style={styles.sectionTitle}>Choose your spirit</Text>
           <Text style={styles.count}>0{selectedNumber} <Text style={styles.countMuted}>/ 03</Text></Text>
         </View>
-        <StyleCarousel designs={basketStyles} selectedId={design} onSelect={setDesign} />
+        <StyleCarousel designs={basketStyles} selectedId={design} onSelect={setDesign} /></>}
       </ScrollView>
 
       <View style={styles.dock}>
@@ -142,6 +154,8 @@ const styles = StyleSheet.create({
   intro: { paddingHorizontal: 24, gap: 5, paddingTop: 4 },
   title: { color: palette.text, fontSize: 22, fontWeight: '600', letterSpacing: -0.7 },
   subtitle: { color: palette.muted, fontSize: 12 },
+  cameraControls: { marginHorizontal: 18, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: -8 },
+  cameraLabel: { color: palette.muted, fontSize: 9, fontWeight: '600', letterSpacing: 1.5 },
   camera: { marginHorizontal: 18, borderRadius: 28, overflow: 'hidden', borderWidth: 1, borderColor: palette.line, backgroundColor: palette.panel },
   cameraHeader: { position: 'absolute', top: 14, left: 14, right: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   designTag: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 12, minHeight: 36, borderRadius: 12, backgroundColor: '#17121ed9' },
@@ -149,10 +163,6 @@ const styles = StyleSheet.create({
   tagName: { color: palette.text, fontSize: 10, letterSpacing: 1.5, fontWeight: '600' },
   fitButton: { backgroundColor: '#17121ed9', minHeight: 44, borderRadius: 12, justifyContent: 'center', paddingHorizontal: 12 },
   fitText: { color: palette.text, fontSize: 11 },
-  fitPanel: { position: 'absolute', top: 64, right: 14, backgroundColor: palette.background, padding: 14, gap: 12, borderRadius: 18, borderWidth: 1, borderColor: palette.line, zIndex: 2 },
-  fitLabel: { color: palette.muted, fontSize: 9, letterSpacing: 1.3 },
-  fitControls: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  fitValue: { color: palette.text, minWidth: 40, textAlign: 'center', fontSize: 13 },
   scanFrame: { position: 'absolute', left: '15%', right: '15%', top: '23%', bottom: '23%' },
   corner: { position: 'absolute', width: 20, height: 20, borderColor: '#fff4e877' },
   topLeft: { top: 0, left: 0, borderLeftWidth: 1.5, borderTopWidth: 1.5, borderTopLeftRadius: 8 },
