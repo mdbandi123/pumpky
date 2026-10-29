@@ -1,5 +1,5 @@
 /* eslint-disable import/no-unresolved -- Browser imports resolve through index.html's import map and pinned CDN URLs. */
-// Browser-only test adapter. Pinned ESM builds load on demand, outside Metro/native bundles.
+// Web AR renderer. Pinned ESM builds load on demand, outside Metro/native bundles.
 const channel = 'pumpky-web-ar';
 const stage = document.getElementById('stage');
 let engine, anchor, creature, THREE, compiledTarget;
@@ -18,7 +18,7 @@ function status(state, message = null) { notify('status', { state, message }); }
 async function prepare(markerUrl) {
   if (engine) return;
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-    throw new Error('Webcam access needs localhost or HTTPS and a browser with camera support.');
+    throw new Error('Camera access needs HTTPS. On iPhone, open the deployed Pumpky link directly in Safari.');
   }
   status('starting', 'Loading the browser tracker… Internet access is needed.');
   const [three, { MindARThree }, { Compiler }, { GLTFLoader }] = await Promise.all([
@@ -46,6 +46,7 @@ async function prepare(markerUrl) {
     container: stage, imageTargetSrc: compiledTarget, maxTrack: 1,
     uiLoading: 'no', uiScanning: 'no', uiError: 'no', warmupTolerance: 3, missTolerance: 5,
   });
+  // MindAR defaults to the environment (rear) camera and sets playsinline for iPhone Safari.
   engine.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   engine.renderer.toneMapping = THREE.ACESFilmicToneMapping;
   engine.renderer.toneMappingExposure = 1.05;
@@ -79,7 +80,12 @@ function applyFit() {
 
 function stop() {
   running = false; tracked = false;
-  if (anchor) anchor.group.visible = false;
+  if (anchor) {
+    anchor.group.visible = false;
+    // MindAR retains this detection edge flag across start/stop. Reset it too,
+    // otherwise an immediately visible badge never emits onTargetFound again.
+    anchor.visible = false;
+  }
   engine?.renderer.setAnimationLoop(null);
   // Startup may reject before a controller exists; still release the camera stream.
   try { engine?.controller?.stopProcessVideo(); } catch { /* already stopped */ }
@@ -91,7 +97,7 @@ async function start(markerUrl) {
   if (running) return;
   await prepare(markerUrl);
   if (!wanted) return;
-  status('permission', 'Allow webcam access when your browser asks.');
+  status('permission', 'Allow camera access when your browser asks. On iPhone, use the rear camera.');
   await engine.start();
   if (!wanted) { stop(); return; }
   running = true; tracked = false;
@@ -134,12 +140,12 @@ window.addEventListener('message', (event) => {
     wanted = true;
     sequence = sequence.then(() => start(data.markerUrl)).catch((error) => {
       stop();
-      notify('error', { message: error?.message || 'Webcam access failed. Check camera permission, close other camera apps, and try again.' });
+      notify('error', { message: error?.message || 'Camera access failed. Open Pumpky in Safari, allow camera access in the website settings, close other camera apps, and try again.' });
     });
   }
 });
-window.addEventListener('pagehide', () => {
+window.addEventListener('pagehide', (event) => {
   wanted = false; stop();
-  if (compiledTarget) URL.revokeObjectURL(compiledTarget);
+  if (compiledTarget && !event.persisted) URL.revokeObjectURL(compiledTarget);
 });
 notify('ready');

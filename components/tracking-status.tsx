@@ -7,7 +7,7 @@ const labels: Record<TrackingState, string> = {
   starting: 'Starting camera…', searching: 'Point at your Pumpky badge',
   permission: 'Allow camera access to start',
   tracking: 'Badge found · hold steady', lost: 'Badge lost · bring it back into view',
-  unavailable: 'AR needs an iPhone development build',
+  unavailable: 'Camera paused · preview your creature',
 };
 
 export function TrackingStatus({ state }: { state: TrackingState }) {

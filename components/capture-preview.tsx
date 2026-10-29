@@ -16,9 +16,17 @@ export function CapturePreview({ uri, onClose }: { uri: string | null; onClose: 
     setError(null);
     try {
       if (Platform.OS === 'web') {
+        // Decode synchronously: Safari's share sheet must retain the tap's user activation.
+        const encoded = uri.split(',')[1];
+        const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
+        const file = new File([bytes], `pumpky-${Date.now()}.png`, { type: 'image/png' });
+        if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+          await navigator.share({ files: [file], title: 'A little Pumpky magic' });
+          return;
+        }
         const download = document.createElement('a');
         download.href = uri;
-        download.download = `pumpky-${Date.now()}.png`;
+        download.download = file.name;
         document.body.appendChild(download);
         download.click();
         download.remove();
@@ -26,7 +34,11 @@ export function CapturePreview({ uri, onClose }: { uri: string | null; onClose: 
       }
       if (!await Sharing.isAvailableAsync()) throw new Error('Sharing is unavailable on this device.');
       await Sharing.shareAsync(uri);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not open your photo.'); }
+    } catch (e) {
+      if (!(e instanceof Error && e.name === 'AbortError')) {
+        setError(e instanceof Error ? e.message : 'Could not open your photo.');
+      }
+    }
     finally { setSharing(false); }
   }
   return <Modal visible={!!uri} animationType="slide" onRequestClose={onClose}>
@@ -36,9 +48,11 @@ export function CapturePreview({ uri, onClose }: { uri: string | null; onClose: 
       {error && <Text style={styles.error} accessibilityRole="alert">{error}</Text>}
       <View style={styles.actions}>
         <Button label="Back to basket" variant="secondary" disabled={sharing} onPress={onClose} />
-        <Button label={Platform.OS === 'web' ? 'Download photo' : 'Save / share'} loading={sharing} onPress={() => { void share(); }} />
+        <Button label="Save / share" loading={sharing} onPress={() => { void share(); }} />
       </View>
-      <Text style={styles.note}>{Platform.OS === 'web' ? 'Download your photo to keep it on this computer.' : 'Choose Save Image in the share sheet to keep your photo.'}</Text>
+      <Text style={styles.note}>{Platform.OS === 'web'
+        ? 'On iPhone, choose Save Image in the share sheet. Browsers without photo sharing download a PNG instead.'
+        : 'Choose Save Image in the share sheet to keep your photo.'}</Text>
     </SafeAreaView>
   </Modal>;
 }

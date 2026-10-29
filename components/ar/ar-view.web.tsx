@@ -37,7 +37,7 @@ export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
       }
       if (data.type === 'error') {
         setFailed(true);
-        setMessage(typeof data.message === 'string' ? data.message : 'The webcam could not start.');
+        setMessage(typeof data.message === 'string' ? data.message : 'The camera could not start. Open this page in Safari and check camera permission.');
         onStatus('unavailable');
       }
       const pending = capture.current;
@@ -45,7 +45,7 @@ export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
         capture.current = null;
         clearTimeout(pending.timer);
         if (typeof data.uri === 'string' && data.uri.startsWith('data:image/png;base64,')) pending.resolve(data.uri);
-        else pending.reject(new Error(data.error || 'The webcam photo could not be captured.'));
+        else pending.reject(new Error(data.error || 'The photo could not be captured.'));
       }
     }
     window.addEventListener('message', receive);
@@ -53,11 +53,21 @@ export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
       window.removeEventListener('message', receive);
       if (capture.current) {
         clearTimeout(capture.current.timer);
-        capture.current.reject(new Error('The webcam was closed.'));
+        capture.current.reject(new Error('The camera was closed.'));
         capture.current = null;
       }
     };
   }, [onStatus]);
+
+  useEffect(() => {
+    if (!enabled || loaded) return;
+    const timer = setTimeout(() => {
+      setFailed(true);
+      setMessage('The camera view could not load. Check your connection and try again.');
+      onStatus('unavailable');
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [enabled, loaded, onStatus]);
 
   useEffect(() => {
     if (!enabled || !loaded) return;
@@ -75,7 +85,7 @@ export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
     capture() {
       return new Promise<string>((resolve, reject) => {
         if (!active || !loaded || failed || capture.current) {
-          reject(new Error('The webcam is not ready.')); return;
+          reject(new Error('The camera is not ready.')); return;
         }
         const id = `capture-${Date.now()}`;
         const timer = setTimeout(() => {
@@ -96,18 +106,18 @@ export function ARView({ ref, design, scale, active, onStatus }: ARViewProps) {
   return <View style={styles.container}>
     {!enabled && <>
       <DesignPreview design={design} scale={scale} active={active} onStatus={onStatus} />
-      <View style={styles.start}><Button label="Test with webcam" onPress={() => {
+      <View style={styles.start}><Button label="Start camera" onPress={() => {
         setEnabled(true); setMessage('Loading the browser tracker…'); onStatus('starting');
       }} /></View>
     </>}
-    {enabled && <iframe ref={frame} src="/web-ar/index.html" title="Pumpky webcam image tracking"
+    {enabled && <iframe ref={frame} src="/web-ar/index.html" title="Pumpky camera and badge tracking"
       allow="camera" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />}
     {enabled && message && <View style={styles.message}>
       <Text style={styles.messageText} accessibilityRole={failed ? 'alert' : undefined}>{message}</Text>
       {failed && <Button label="Back to preview" variant="secondary" onPress={retry} />}
     </View>}
     {enabled && !failed && loaded && <View style={styles.stop}>
-      <Button label="Stop webcam" variant="secondary" onPress={retry} />
+      <Button label="Stop camera" variant="secondary" onPress={retry} />
     </View>}
   </View>;
 }

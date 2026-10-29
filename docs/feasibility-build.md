@@ -1,5 +1,7 @@
 # Pumpky feasibility build
 
+> Historical native-first feasibility notes. The primary delivery target is now iPhone Safari on Vercel; use the [web deployment guide](web-deployment.md) for current setup and testing. Native Viro builds remain optional. References below to “Test with webcam” describe the original UI; the website now uses “Start camera”.
+
 ## Scope
 
 One iPhone, one known basket, and one flat badge fixed rigidly to its front centre. Select Jack (pumpkin), Boo (ghost), or Goblin (monster), adjust the shell size, reset tracking, and capture a still photo. The capture preview opens the system share sheet for saving/sharing. Photos are temporary until saved through that sheet. Photo capture uses Viro's rendered view, so controls are excluded; camera-background compositing must be verified on the phone.

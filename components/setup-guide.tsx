@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from './button';
@@ -22,8 +22,12 @@ export function SetupGuide({ visible, onClose }: { visible: boolean; onClose: ()
               <Text style={styles.copy}>Print the full badge at 80 × 100 mm. Keep it flat, on a piece of matte card.</Text>
             </View>
           </View>
+          {Platform.OS === 'web' && <a href="/badge/print.html" target="_blank" rel="noopener noreferrer"
+            style={{ color: palette.accent, fontSize: 14, padding: '12px 0' }}>Open printable badge ↗</a>}
           <Step number="01" title="Dress the basket" detail="Fix the badge to the front centre of your basket. Keep it still against the basket, with no curves or dangling edges." />
-          <Step number="02" title="Find the magic" detail="Point your camera at the whole badge in good light. Move closer until Pumpky finds it." />
+          <Step number="02" title="Find the magic" detail={Platform.OS === 'web'
+            ? 'Tap Start camera and allow access. On iPhone, open Pumpky directly in Safari. Point the rear camera at the whole badge in good light.'
+            : 'Point your camera at the whole badge in good light. Move closer until Pumpky finds it.'} />
           <Step number="03" title="Pick. Pose. Capture." detail="Choose a creature, adjust Fit if needed, and tap the shutter. Save your photo from the preview." />
           <Button label="Let’s make some magic" onPress={onClose} />
         </ScrollView>

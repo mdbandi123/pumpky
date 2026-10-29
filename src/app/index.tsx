@@ -129,7 +129,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: palette.background },
-  screen: { flex: 1, width: '100%', maxWidth: 520, alignSelf: 'center' },
+  screen: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center' },
   header: { paddingHorizontal: 24, minHeight: 66, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   brandMark: { color: palette.accent, fontSize: 32 },
